@@ -248,9 +248,9 @@ document.addEventListener('click',async e=>{const t=e.target;
  if(act=='cbk')return backup();
  if(act=='crs')return restore();
  if(act=='add')return $('picker').click();
- if(act=='newpl'){const n=prompt('Playlist name');if(n&&n.trim()){const id=await put('playlists',{name:n.trim(),ids:[]});await load();view={k:'pl',id};render()};return}
- if(act=='renpl'){const l=pls.find(x=>x.id==view.id),n=prompt('Rename playlist',l.name);if(n&&n.trim()){l.name=n.trim();await put('playlists',l);await load();render()};return}
- if(act=='delpl'){const l=pls.find(x=>x.id==view.id);if(confirm('Delete "'+l.name+'"? The songs stay in your library.')){await del('playlists',l.id);await load();view={k:'pls',id:0};render()};return}
+ if(act=='newpl'){const n=prompt('Playlist name');if(n&&n.trim()){const id=await put('playlists',{name:n.trim(),ids:[]});await load();view={k:'pl',id};render()}return}
+ if(act=='renpl'){const l=pls.find(x=>x.id==view.id),n=prompt('Rename playlist',l.name);if(n&&n.trim()){l.name=n.trim();await put('playlists',l);await load();render()}return}
+ if(act=='delpl'){const l=pls.find(x=>x.id==view.id);if(confirm('Delete "'+l.name+'"? The songs stay in your library.')){await del('playlists',l.id);await load();view={k:'pls',id:0};render()}return}
  if(act=='playall'){if(shown.length)play(shown[0],shown);return}
  if(act=='fav'&&s){s.fav=!s.fav;await put('songs',s);render();return}
  if(act=='more'&&s){e.stopPropagation();menu(a,s);return}
@@ -268,7 +268,8 @@ addEventListener('keydown',e=>{if(e.code=='Space'&&!/INPUT|SELECT|TEXTAREA|BUTTO
 
 function play(id,ids){if(ids)queue=ids;const s=songs.find(x=>x.id==id);if(!s)return;if(cu)URL.revokeObjectURL(cu);cu=URL.createObjectURL(s.blob);audio.src=cu;audio.play();cur=id;bar();render();
  if('mediaSession' in navigator){const m=meta(s);navigator.mediaSession.metadata=new MediaMetadata({title:m.title,artist:m.artist,album:s.album||'My Music',artwork:s.cover?[{src:cov(s),sizes:'512x512',type:s.cover.type}]:[]})}}
-function step(dir){if(!queue.length)queue=shown.length?shown:songs.map(s=>s.id);if(!queue.length)return;const i=queue.indexOf(cur);let n;if(shuf&&queue.length>1){do{n=Math.floor(Math.random()*queue.length)}while(n==i)}else{n=i+dir;if(n>=queue.length)n=0;if(n<0)n=queue.length-1}play(queue[n])}
+function step(dir){if(!queue.length)queue=shown.length?shown:songs.map(s=>s.id);if(!queue.length)return;const i=queue.indexOf(cur);let n;
+ if(shuf&&queue.length>1){do{n=Math.floor(Math.random()*queue.length)}while(n==i)}else{n=i+dir;if(n>=queue.length)n=0;if(n<0)n=queue.length-1}play(queue[n])}
 function bar(){const s=songs.find(x=>x.id==cur),m=s&&meta(s);$('bt').textContent=s?m.title:'Nothing playing';$('ba').textContent=s?(m.artist||'Unknown artist')+' · '+qual(s).t:'Choose a record';$('bc').hidden=!s;$('bc').src=s?cov(s):'';}
 function icons(){$('shuf').innerHTML=I('shuf');$('prev').innerHTML=I('back');$('next').innerHTML=I('fwd');$('rep').innerHTML=I('rep')+(rep==2?'<i class="o">1</i>':'');$('vi').innerHTML=I('vol');$('play').innerHTML=I(audio.paused?'play':'pause');$('shuf').classList.toggle('on',shuf);$('rep').classList.toggle('on',rep>0)}
 $('play').onclick=()=>{if(!audio.src){step(1);return}audio.paused?audio.play():audio.pause()};
@@ -277,7 +278,7 @@ $('prev').onclick=()=>{if(audio.currentTime>3)audio.currentTime=0;else step(-1)}
 $('shuf').onclick=()=>{shuf=!shuf;$('shuf').classList.toggle('on',shuf)};
 $('rep').onclick=()=>{rep=(rep+1)%3;audio.loop=rep==2;$('rep').classList.toggle('on',rep>0);icons()};
 audio.onplay=audio.onpause=()=>{icons();const e=document.querySelector('.row.cur .eq');if(e)e.classList.toggle('ps',audio.paused)};
-audio.onended=()=>{const i=queue.indexOf(cur);if(i>=0&&i<queue.length-1)step(1);else{audio.pause();audio.currentTime=0;cur=null;bar();render();}};
+audio.onended=()=>{const i=queue.indexOf(cur);if(rep==1||shuf||i<queue.length-1)step(1)};
 audio.onloadedmetadata=()=>{const s=songs.find(x=>x.id==cur);if(s&&!s.dur&&isFinite(audio.duration)){s.dur=audio.duration;put('songs',s)}};
 audio.ontimeupdate=()=>{const p=audio.duration?audio.currentTime/audio.duration*1000:0;$('cur').textContent=fmt(audio.currentTime);$('dur').textContent=fmt(audio.duration);$('seek').value=p;$('seek').style.setProperty('--fill',p/10+'%')};
 $('seek').oninput=()=>{if(audio.duration)audio.currentTime=$('seek').value/1000*audio.duration};
