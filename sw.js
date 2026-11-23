@@ -1,6 +1,6 @@
 // Caches the app so it opens with no internet. Your songs live in the browser database, not here.
 // Bump this version whenever you publish a new index.html so old caches are dropped.
-const C = 'mymusic-v4', A = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+const C = 'mymusic-v10', A = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => c.addAll(A)).then(() => self.skipWaiting()));
 });
