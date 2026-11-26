@@ -296,6 +296,10 @@ select{height:44px;min-width:0;background:var(--bg);color:var(--mu);border:1px s
 @keyframes breathe{0%,100%{opacity:.45;transform:scale(1)}50%{opacity:1;transform:scale(1.3)}}
 .sun{transform-box:fill-box;transform-origin:center;animation:breathe 3.2s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){.sun{animation:none}}
+.promo{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:16px;padding:14px 16px;border:1px solid var(--pg);background:var(--sf)}
+.promo span{flex:1 1 220px;font-size:13px;color:var(--mu)}.promo b{color:var(--fg);font-weight:500}.promo .pill{height:40px;flex:none}
+#lyb{position:relative;max-height:55vh;overflow-y:auto;margin-top:12px;padding:8px 0;scrollbar-width:thin}
+.lyl{font:400 19px/1.5 var(--se);color:var(--fa);padding:6px 0;cursor:pointer;transition:color .25s,transform .25s}.lyl:hover{color:var(--fg)}.lyl.on{color:var(--pr);transform:translateX(4px)}
 </style>
 </head>
 <body>
@@ -352,7 +356,7 @@ const IC={folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-
 const I=(n,x='')=>`<svg class="i" viewBox="0 0 24 24" ${x}>${IC[n]}</svg>`,FILL='style="fill:currentColor;stroke:none"';
 const MOODS=['Calm','Night','Devotional','Pulse'],SPEEDS=[.5,.75,1,1.25,1.5,2],SLEEPS=[0,15,30,60],MOD=/Mac|iPhone|iPad/.test(navigator.platform)?'⌘K':'Ctrl K';
 let db,songs=[],pls=[],view={k:'orbit',id:0},queue=[],shown=[],orbQ=[],cur=null,shuf=0,rep=0,cu=null,q='',sort='added',lview='list';
-let spin=0,od=null,loopA=null,loopB=null,spi=2,slpi=0,sleepAt=0,sleepTotal=1,dgs=0,cmdSel=0,cmdItems=[],plEdit=0,plDel=0;
+let LIM=150,spin=0,od=null,loopA=null,loopB=null,spi=2,slpi=0,sleepAt=0,sleepTotal=1,dgs=0,cmdSel=0,cmdItems=[],plEdit=0,plDel=0;
 const CU=new Map(),opn=new Set();
 const hash=s=>{let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
@@ -369,16 +373,27 @@ const stat=id=>ST[id]||(ST[id]={p:0,l:0,t:0}),peek=id=>ST[id]||{p:0,l:0,t:0},sav
 function applyAccent(){const r=document.documentElement.style,h=ACC;r.setProperty('--pr',`oklch(.83 .14 ${h})`);r.setProperty('--pg',`oklch(.83 .14 ${h}/.35)`);r.setProperty('--pf',`oklch(.17 .02 ${h})`)}
 applyAccent();
 let PRO=lsGet('eo_pro',null); // {key,since}
+// 7-day Plus trial: once per device (kept in localStorage + a cookie), reduced limits so it can't be abused
+const TRIAL_DAYS=7,paidKey=()=>!APP_CONFIG.proGatingEnabled||!!(PRO&&PRO.key);
+function trialStart(){let v=+lsGet('eo_trial',0)||0;if(!v){const m=document.cookie.match(/(?:^|; )eo_t=(\d+)/);if(m)v=+m[1]}return v}
+const trialLeft=()=>{const t=trialStart();if(!t||t>Date.now()+864e5)return 0;return Math.max(0,t+TRIAL_DAYS*864e5-Date.now())},trialActive=()=>trialLeft()>0,trialUsed=()=>!!trialStart();
+function startTrial(){if(PRO&&PRO.key)return toast('You already have a plan');if(trialUsed())return toast(trialActive()?'Your trial is already running':'The free trial was already used on this device');const n=Date.now();lsSet('eo_trial',n);try{document.cookie='eo_t='+n+';max-age=31536000;path=/;SameSite=Lax'}catch(e){}render();toast('Plus trial started. 7 days of Plus, free')}
+function trialNotice(){if(PRO&&PRO.key||!trialUsed())return;const d=todayKey();if(trialActive()){const l=Math.ceil(trialLeft()/864e5);if(l<=2&&lsGet('eo_trial_rem','')!=d){lsSet('eo_trial_rem',d);toast('Your Plus trial ends in '+l+' day'+(l==1?'':'s')+'. Plans from ₹29')}}else if(!lsGet('eo_trial_end',0)){lsSet('eo_trial_end',1);toast('Your free trial ended. Keep Plus from Menu, Plans')}}
+function promoHtml(){if(paidKey())return'';const d=Math.ceil(trialLeft()/864e5);
+ if(trialActive())return`<div class="promo"><span><b>Plus trial</b> · ${d} day${d==1?'':'s'} left</span><button class="pill am" data-v="pro">Keep Plus from ₹59</button></div>`;
+ if(!trialUsed())return`<div class="promo"><span><b>Try Plus free for 7 days</b> · studio sound, synced lyrics, cloud backup</span><button class="pill solid" data-a="trialstart">Start free trial</button></div>`;
+ return`<div class="promo"><span><b>Unlock the full studio</b> · plans from ₹29 a month</span><button class="pill am" data-v="pro">See plans</button></div>`}
 const TIERS={free:0,lite:1,plus:2,max:3};
-const tier=()=>!APP_CONFIG.proGatingEnabled?3:(PRO&&PRO.key?(TIERS[PRO.plan]??3):0);
+const tier=()=>!APP_CONFIG.proGatingEnabled?3:(PRO&&PRO.key?(TIERS[PRO.plan]??3):(trialActive()?TIERS.plus:0));
 const has=n=>tier()>=TIERS[n],isPro=()=>tier()>=1;
-const expLimit=()=>has('plus')?Infinity:has('lite')?10:APP_CONFIG.freeExportsPerDay;
-const cloudCapMB=()=>has('max')?500:has('plus')?200:0;
-const PLANS=[{id:'lite',name:'Lite',price:29,tag:'Sound control',f:['Custom 10-band EQ sliders','All accent colours','Fade between songs','10 Studio exports a day']},{id:'plus',name:'Plus',price:59,tag:'Most popular',f:['Everything in Lite','Unlimited Studio exports','Cloud backup, 200 MB','Wake-up alarm']},{id:'max',name:'Max',price:99,tag:'Everything',f:['Everything in Plus','Cloud backup, 500 MB','24-bit Hi-Res WAV exports','Priority support']}];
+const expLimit=()=>has('plus')?(paidKey()?Infinity:15):has('lite')?10:APP_CONFIG.freeExportsPerDay;
+const cloudCapMB=()=>has('max')?500:has('plus')?(paidKey()?200:50):0;
+const PLANS=[{id:'lite',name:'Lite',price:29,year:290,tag:'Sound control',f:['Custom 10-band EQ sliders','All accent colours','Fade between songs','10 Studio exports a day']},{id:'plus',name:'Plus',price:59,year:590,tag:'Most popular',f:['Everything in Lite','Unlimited Studio exports','Synced lyrics that follow the song','Cloud backup, 200 MB','Wake-up alarm']},{id:'max',name:'Max',price:99,year:990,tag:'Everything',f:['Everything in Plus','Cloud backup, 500 MB','24-bit Hi-Res WAV exports','Priority support']}];
 let PAYPLAN='',PROWHY='';
 const todayKey=()=>new Date().toISOString().slice(0,10);
-function expUsed(){const d=lsGet('eo_exp_day',{d:'',n:0});return d.d==todayKey()?d.n:0}
-function expBump(){lsSet('eo_exp_day',{d:todayKey(),n:expUsed()+1})}
+function ckGet(){const m=document.cookie.match(/(?:^|; )eo_x=([^;]*)/);if(!m)return{d:'',n:0};const p=decodeURIComponent(m[1]).split(':');return{d:p[0],n:+p[1]||0}}
+function expUsed(){const a=lsGet('eo_exp_day',{d:'',n:0}),b=ckGet(),t=todayKey();return Math.max(a&&a.d==t?(+a.n||0):0,b.d==t?b.n:0)}
+function expBump(){const o={d:todayKey(),n:expUsed()+1};lsSet('eo_exp_day',o);try{document.cookie='eo_x='+encodeURIComponent(o.d+':'+o.n)+';max-age=172800;path=/;SameSite=Lax'}catch(e){}}
 const isMobile=()=>/Android|iP(hone|ad|od)|Mobi/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 
 // ---------- storage: keep "mymusic" at v2 (zero upgrade-blocking), separate DB for folder handles, safe fallback ----------
@@ -451,7 +466,7 @@ function parseName(n){const b=clean(n.replace(/_/g,' ')),p=b.split(/\s+[-–—]
 const meta=s=>{const p=parseName(s.name);return{title:clean(s.title||p.title)||p.title,artist:clean(s.artist||p.artist)}};
 const VW=/(live|remix|acoustic|unplugged|instrumental|demo|remaster(?:ed)?|radio edit|extended|club|cover|karaoke|studio|original|mix|edit|version)/i,VT=/\s[-–]\s*[^-–]*(live|remix|acoustic|demo|remaster\w*|version|mix|edit)[^-–]*$/i;
 function ver(t){for(const x of t.match(/[(\[][^)\]]*[)\]]/g)||[])if(VW.test(x))return x.slice(1,-1).trim().slice(0,20);const d=t.match(VT);return d?d[0].replace(/^\s[-–]\s*/,'').trim().slice(0,20):'Original'}
-const gk=s=>{const m=meta(s);return(m.title.replace(/[(\[][^)\]]*[)\]]/g,x=>VW.test(x)?'':x).replace(VT,'')+'|'+m.artist).toLowerCase().replace(/[^a-z0-9|]/g,'')};
+const GKC=new Map(),gk=s=>{const key=(s.name||'')+'\u0001'+(s.title||'')+'\u0001'+(s.artist||'');let v=GKC.get(key);if(v===undefined){v=gk0(s);GKC.set(key,v)}return v},gk0=s=>{const m=meta(s);return(m.title.replace(/[(\[][^)\]]*[)\]]/g,x=>VW.test(x)?'':x).replace(VT,'')+'|'+m.artist).toLowerCase().replace(/[^a-z0-9|]/g,'')};
 const ext=s=>((s.blob.name||'').split('.').pop()||'').toLowerCase()||(s.blob.type||'').split('/').pop();
 const isLL=s=>!!s.ll||['flac','wav','aiff','aif','x-flac','x-wav','wave'].includes(ext(s));
 function qual(s){const e=ext(s),nm=s.ll?'ALAC':({mpeg:'MP3',mp3:'MP3','x-flac':'FLAC','x-wav':'WAV',wave:'WAV',mp4:'M4A','x-m4a':'M4A'}[e]||e.toUpperCase());
@@ -469,7 +484,17 @@ const fsz=b=>b>=1073741824?(b/1073741824).toFixed(2)+' GB':Math.round(b/1048576)
 const toast=m=>{const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2600)};
 const mood=s=>s.mood||s.amood||MOODS[hash(gk(s))%4];
 function reps(l){const G=new Map();for(const s of l){const k=gk(s);if(!G.has(k))G.set(k,[]);G.get(k).push(s)}return[...G.values()].map(g=>g.find(s=>s.def)||g[0])}
-const nav=(k,id=0)=>{closeSheet();closeMenu();closeMN();plEdit=0;plDel=0;if(k=='find'&&view.k!='find'){FQ='';FF={m:null,t:null,x:null}}view={k,id};q='';render();scrollTo(0,0)};
+const anyOverlay=()=>!$('sheet').hidden||$('dw').classList.contains('open')||!$('cmd').hidden||!$('qv').hidden||!$('mo').hidden;
+const pushOv=()=>{if(!(history.state&&history.state.ov)){try{history.pushState({eo:1,ov:1,k:view.k,id:view.id},'')}catch(e){}}};
+const nav=(k,id=0,pop)=>{closeSheet();closeMenu();closeMN();closeMO();closeCmd();closeQ();plEdit=0;plDel=0;LIM=150;if(k=='find'&&view.k!='find'){FQ='';FF={m:null,t:null,x:null}}const ch=view.k!=k||view.id!=id;view={k,id};q='';
+ if(!pop&&ch){const st={eo:1,k,id};try{history.state&&history.state.ov?history.replaceState(st,''):history.pushState(st,'')}catch(e){}}
+ render();scrollTo(0,0)};
+// Back button / swipe-back: first closes any open panel, then walks back through the pages you visited
+addEventListener('popstate',e=>{const st=e.state;
+ if(anyOverlay()){closeSheet();closeMN();closeMO();closeCmd();closeQ();if(!st||!st.eo||st.k!=view.k||st.id!=view.id){try{history.pushState({eo:1,k:view.k,id:view.id},'')}catch(x){}}return}
+ if(!st||!st.eo||st.ov)return;
+ if(st.k==view.k&&st.id==view.id){history.back();return}
+ nav(st.k,st.id,1)});
 const fmtWhen=t=>{if(!t)return'Never';const d=new Date(t),n=new Date(),hm=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false}),dy=Math.round((new Date(n.getFullYear(),n.getMonth(),n.getDate())-new Date(d.getFullYear(),d.getMonth(),d.getDate()))/864e5);return dy==0?'Today, '+hm:dy==1?'Yesterday, '+hm:d.toLocaleDateString([],{day:'numeric',month:'short'})+', '+hm};
 
 // ---------- adding songs ----------
@@ -623,11 +648,11 @@ const row=(s,i,sub,g)=>{const m=meta(s),on=s.id==cur,V=ver(m.title),n=g?g.length
 function filt(l){const t=q.trim().toLowerCase();l=t?l.filter(s=>(s.name+' '+(s.title||'')+' '+(s.artist||'')+' '+(s.album||'')).toLowerCase().includes(t)):[...l];const T=s=>meta(s).title,A=s=>meta(s).artist;
  if(sort=='title')l.sort((a,b)=>T(a).localeCompare(T(b)));else if(sort=='artist')l.sort((a,b)=>A(a).localeCompare(A(b)));else if(sort=='duration')l.sort((a,b)=>(a.dur||0)-(b.dur||0));else l.sort((a,b)=>b.added-a.added);return l}
 function plSongs(id){const l=pls.find(x=>x.id==id);return l?l.ids.map(i=>songs.find(s=>s.id==i)).filter(Boolean):[]}
-function listHtml(){const fav=view.k=='fav',out=[],ids=[];
- if(['pl','grp','recent','most','mood'].includes(view.k))viewSongs().forEach((s,i)=>{out.push(row(s,i));ids.push(s.id)});
+function listHtml(){const fav=view.k=='fav',out=[],ids=[];let tot=0;const add=(s,i,sub,g)=>{ids.push(s.id);tot++;if(out.length<LIM)out.push(row(s,i,sub,g))};
+ if(['pl','grp','recent','most','mood'].includes(view.k))viewSongs().forEach((s,i)=>add(s,i));
  else{const G=new Map();for(const s of filt(fav?songs.filter(s=>s.fav):songs)){const k=gk(s);if(!G.has(k))G.set(k,[]);G.get(k).push(s)}
-  let i=0;for(const [k,g] of G){const rp=g.find(s=>s.def)||g[0];out.push(row(rp,i++,0,g));ids.push(rp.id);if(opn.has(k))for(const s of g)if(s!==rp){out.push(row(s,0,1,g));ids.push(s.id)}}}
- shown=ids;return out.length?`<div class="list">${out.join('')}</div>`:`<p class="none">${q?'Nothing matches “'+esc(q)+'”.':fav?'Nothing held close yet. Tap a heart.':view.k=='pl'?'This playlist is empty. Open the ⋯ menu on any song and choose a playlist.':view.k=='recent'||view.k=='most'?'Play some songs and they will show up here.':'Nothing here.'}</p>`}
+  let i=0;for(const [k,g] of G){const rp=g.find(s=>s.def)||g[0];add(rp,i++,0,g);if(opn.has(k))for(const s of g)if(s!==rp)add(s,0,1,g)}}
+ shown=ids;const rest=tot-out.length;return out.length?`<div class="list">${out.join('')}</div>${rest>0?`<div class="hm" style="padding:16px"><button class="pill am" data-a="showmore">Show ${Math.min(rest,200)} more · ${rest} left</button></div>`:''}`:`<p class="none">${q?'Nothing matches “'+esc(q)+'”.':fav?'Nothing held close yet. Tap a heart.':view.k=='pl'?'This playlist is empty. Open the ⋯ menu on any song and choose a playlist.':view.k=='recent'||view.k=='most'?'Play some songs and they will show up here.':'Nothing here.'}</p>`}
 const bodyHtml=()=>view.k=='lib'&&lview=='orbit'?orbitHtml(filt(songs)):listHtml();
 function paint(){const e=$('lst');if(!e)return;e.innerHTML=bodyHtml();if($('oct'))setOC(songs.find(x=>x.id==cur))}
 
@@ -640,7 +665,7 @@ function dayDial(){if(!CLKOPEN){const t0=CLK.reduce((a,b)=>a+b,0)/60;return`<div
 
 // orbit view of the library: songs as dots on concentric mood rings
 function orbitHtml(list){const rs=reps(list),cs=songs.find(x=>x.id==cur);orbQ=rs.map(s=>s.id);if(!rs.length)return`<p class="none">${q?'Nothing matches “'+esc(q)+'”.':'Nothing here.'}</p>`;let g='';
- MOODS.forEach((m,ri)=>{const r=110+ri*55,ring=rs.filter(s=>mood(s)==m);let d='';
+ MOODS.forEach((m,ri)=>{const r=110+ri*55,ring=rs.filter(s=>mood(s)==m).slice(0,150);let d='';
   ring.forEach((s,i)=>{const a=i/ring.length*Math.PI*2+ri*.6+.3,x=300+r*Math.cos(a),y=300+r*Math.sin(a),act=cs&&gk(s)==gk(cs);
    if(act)for(let k=0;k<8;k++){const t=a-(k+1)*.045;d+=`<circle cx="${300+r*Math.cos(t)}" cy="${300+r*Math.sin(t)}" r="${5-k*.5}" fill="var(--pr)" opacity="${.5-k*.06}"/>`}
    d+=`<g class="od${act?' act':''}" data-orb="${s.id}" tabindex="0" role="button" aria-label="Play ${esc(meta(s).title)} by ${esc(meta(s).artist)}"><circle cx="${x}" cy="${y}" r="16" fill="transparent"/><circle class="dt" cx="${x}" cy="${y}" r="4"/></g>`});
@@ -693,7 +718,7 @@ async function shareStats(){const tot=CLK.reduce((a,b)=>a+b,0),by=songs.map(s=>(
 function homeHtml(){
  if(!songs.length)return`<div class="npe"><svg viewBox="0 0 120 120" width="240" height="240" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="none" stroke="oklch(1 0 0/.14)"/><circle cx="60" cy="60" r="38" fill="none" stroke="oklch(1 0 0/.14)"/><circle cx="60" cy="60" r="24" fill="none" stroke="oklch(1 0 0/.14)"/><circle class="sun" cx="60" cy="60" r="5" fill="var(--pr)"/><g class="ro" style="transform-origin:60px 60px;animation-duration:16s"><circle cx="112" cy="60" r="3.5" fill="var(--pr)"/></g><g class="ro" style="transform-origin:60px 60px;animation-duration:24s;animation-direction:reverse"><circle cx="98" cy="60" r="3" fill="var(--fg)"/></g><g class="ro" style="transform-origin:60px 60px;animation-duration:11s"><circle cx="84" cy="60" r="2.5" fill="var(--mu)"/></g></svg><p style="margin-top:16px">Your orbit is empty</p><div class="ha" style="justify-content:center"><button class="pill solid" data-a="scanopen">${I('folder')} Smart scan</button><button class="pill" data-a="add">${I('plus')} Add files</button><button class="pill am" data-a="demo">${I('play')} 20s demo</button></div></div>`;
  const h=new Date().getHours(),g=h<5?'Still up?':h<12?'Good morning':h<17?'Good afternoon':'Good evening',last=songs.filter(s=>peek(s.id).l).sort((a,b)=>peek(b.id).l-peek(a.id).l)[0],rec=[...songs].sort((a,b)=>b.added-a.added).slice(0,12),rs=reps(songs);
- return`<div class="hhome"><header class="hd"><p class="lbl">${g}</p><div class="r"><div><h1>In orbit</h1><p class="m">${songs.length} songs · ${fmtT(sumD(songs))}</p></div></div></header><div class="ha hm"><button class="pill solid" data-a="shufall">${I('shuf')} Shuffle all</button>${last?`<button class="pill" data-orb="${last.id}">${I('play')} Resume · ${esc(meta(last).title.slice(0,16))}</button>`:''}</div>${orbitHtml(songs)}<p class="lbl hsh">Jump into a mood</p><div class="fxr hm">${MOODS.map(m=>`<button data-a="playmood" data-val="${m}">${m} · ${rs.filter(x=>mood(x)==m).length}</button>`).join('')}</div><p class="lbl hsh">Smart mixes</p><div class="fxr hm">${MIXES.map(m=>`<button data-a="playmix" data-val="${m[0]}">${m[1]} · ${mixList(m[0]).length}</button>`).join('')}</div><p class="lbl hsh">Recently added</p><div class="hstrip">${rec.map(x=>`<button class="card press" data-orb="${x.id}"><img src="${cov(x)}" alt="" loading="lazy"><b>${esc(meta(x).title)}</b><span>${esc(meta(x).artist||'Unknown artist')}</span></button>`).join('')}</div></div>`}
+ return`<div class="hhome"><header class="hd"><p class="lbl">${g}</p><div class="r"><div><h1>In orbit</h1><p class="m">${songs.length} songs · ${fmtT(sumD(songs))}</p></div></div></header><div class="ha hm"><button class="pill solid" data-a="shufall">${I('shuf')} Shuffle all</button>${last?`<button class="pill" data-orb="${last.id}">${I('play')} Resume · ${esc(meta(last).title.slice(0,16))}</button>`:''}</div>${promoHtml()}${orbitHtml(songs)}<p class="lbl hsh">Jump into a mood</p><div class="fxr hm">${MOODS.map(m=>`<button data-a="playmood" data-val="${m}">${m} · ${rs.filter(x=>mood(x)==m).length}</button>`).join('')}</div><p class="lbl hsh">Smart mixes</p><div class="fxr hm">${MIXES.map(m=>`<button data-a="playmix" data-val="${m[0]}">${m[1]} · ${mixList(m[0]).length}</button>`).join('')}</div><p class="lbl hsh">Recently added</p><div class="hstrip">${rec.map(x=>`<button class="card press" data-orb="${x.id}"><img src="${cov(x)}" alt="" loading="lazy"><b>${esc(meta(x).title)}</b><span>${esc(meta(x).artist||'Unknown artist')}</span></button>`).join('')}</div></div>`}
 function setOC(s){if(!$('oct'))return;$('oci').hidden=!s;if(s)$('oci').src=cov(s);$('oct').textContent=s?meta(s).title:'';$('oca').textContent=s?(meta(s).artist||''):''}
 
 const WELCOME=`<div class="wl"><button class="wb press" data-a="scanopen"><svg viewBox="0 0 120 120" width="96" height="96" aria-hidden="true"><circle cx="60" cy="60" r="50" fill="none" stroke="oklch(1 0 0/.16)" stroke-dasharray="2 4"/><circle cx="60" cy="60" r="30" fill="none" stroke="oklch(1 0 0/.16)"/><circle cx="60" cy="60" r="4" fill="oklch(.93 .008 240)"/><circle cx="110" cy="60" r="3" fill="oklch(.83 .14 75)"/></svg><h1>The room is quiet.<br><em>Scan your music folder.</em></h1><span class="wu">${I('folder')} Smart background import · skips voice notes &amp; ringtones</span><span class="lbl">mp3 · flac · wav · m4a · ogg</span></button><div class="ha" style="margin-top:20px;justify-content:center"><button class="pill solid" data-a="scanopen">${I('folder')} Smart Scan Folder</button><button class="pill" data-a="add">${I('plus')} Pick files</button><button class="pill am" data-a="demo">${I('play')} 20s demo</button></div></div>`;
@@ -708,7 +733,7 @@ function render(){side();tabs();const v=view;let h='';document.body.classList.to
  else if(v.k=='fav'){const f=songs.filter(s=>s.fav);h=hd('Inner orbit','Favorites',f.length+' tracks · '+fmtT(sumD(f)))+`<section class="sec" id="lst">${listHtml()}</section>`}
  else if(!songs.length)h=WELCOME.replace(/<\/div>$/,tipsHtml()+'</div>');
  else{const ll=songs.filter(isLL).length;
-  h=hd('Library / on this device','Library',`${songs.length} tracks · ${fmtT(sumD(songs))} · ${ll} lossless`,PLBTN)+dayDial()+`<div class="tbar"><select id="so" aria-label="Sort">${[['added','Recently added'],['title','Title'],['artist','Artist'],['duration','Duration']].map(x=>`<option value="${x[0]}"${sort==x[0]?' selected':''}>${x[1]}</option>`).join('')}</select><div class="vt" role="tablist" aria-label="View">${['list','orbit'].map(x=>`<button role="tab" aria-selected="${lview==x}" class="${lview==x?'on':''}" data-lv="${x}">${x}</button>`).join('')}</div></div><section class="sec" id="lst">${bodyHtml()}</section>`}
+  h=hd('Library / on this device','Library',`${songs.length} tracks · ${fmtT(sumD(songs))} · ${ll} lossless`,PLBTN)+promoHtml()+dayDial()+`<div class="tbar"><select id="so" aria-label="Sort">${[['added','Recently added'],['title','Title'],['artist','Artist'],['duration','Duration']].map(x=>`<option value="${x[0]}"${sort==x[0]?' selected':''}>${x[1]}</option>`).join('')}</select><div class="vt" role="tablist" aria-label="View">${['list','orbit'].map(x=>`<button role="tab" aria-selected="${lview==x}" class="${lview==x?'on':''}" data-lv="${x}">${x}</button>`).join('')}</div></div><section class="sec" id="lst">${bodyHtml()}</section>`}
  $('wrap').innerHTML=h;if($('oct'))setOC(songs.find(x=>x.id==cur));if(v.k=='cloud'&&ses)cloudInfo();if(v.k=='storage')storageInfo();if(v.k=='find'){const i=$('fq');if(i&&!FQ&&!FF.m&&!FF.t&&!FF.x)i.focus()}}
 const NAV=[['orbit','Orbit','orbit'],['find','Search','search'],['fav','Favorites','heart'],['pls','Playlists','list'],['lib','Library','lib']];
 // Add more menu entries here: [view key, label, icon name]
@@ -721,7 +746,7 @@ function tabs(){$('tabs').innerHTML=NAV.map(n=>`<button${isOn(n[0])?' class="on"
 // ---------- row menu ----------
 const closeMenu=()=>{const p=$('pop');if(p)p.remove()};
 const closeMN=()=>{const d=$('dw');d.classList.remove('open');d.inert=true};
-function toggleMN(){const d=$('dw');if(d.classList.contains('open'))return closeMN();closeMenu();let g='',h='';for(const m of MENU){if(m[3]!=g){g=m[3];h+=`<p class="lbl dwg">${g}</p>`}h+=`<button class="dwi${view.k==m[0]?' on':''}" data-v="${m[0]}">${I(m[2])}<span>${esc(m[1])}</span></button>`}$('dwl').innerHTML=h;d.inert=false;d.classList.add('open');setTimeout(()=>{const f=d.querySelector('.dwi');if(f)f.focus()},60)}
+function toggleMN(){const d=$('dw');if(d.classList.contains('open'))return closeMN();closeMenu();let g='',h='';for(const m of MENU){if(m[3]!=g){g=m[3];h+=`<p class="lbl dwg">${g}</p>`}h+=`<button class="dwi${view.k==m[0]?' on':''}" data-v="${m[0]}">${I(m[2])}<span>${esc(m[1])}</span></button>`}$('dwl').innerHTML=h;pushOv();d.inert=false;d.classList.add('open');setTimeout(()=>{const f=d.querySelector('.dwi');if(f)f.focus()},60)}
 function menu(btn,s){closeMenu();const p=document.createElement('div');p.className='pop';p.id='pop';
  p.innerHTML=`<button data-p="next">Play next</button><button data-p="sim">Play similar</button><p class="lbl">Add to playlist</p>${pls.map(l=>`<button data-p="${l.id}">${l.ids.includes(s.id)?'✓ ':''}${esc(l.name)}</button>`).join('')}<button data-p="new">+ New playlist…</button><p class="lbl">Orbit ring</p><button data-p="mood:auto">${s.mood?'':'✓ '}Auto · from the sound</button>${MOODS.map(m=>`<button data-p="mood:${m}">${s.mood==m?'✓ ':''}${m}</button>`).join('')}${songs.filter(x=>gk(x)==gk(s)).length>1?`<button data-p="def">${s.def?'✓ Default version (tap to clear)':'Set as default version'}</button>`:''}<button data-p="export">Export with current sound (.wav)</button><button data-p="edit">Edit info &amp; lyrics</button><button data-p="info">Show file info</button>${view.k=='pl'?'<button data-p="up">Move up</button><button data-p="dn">Move down</button><button data-p="rm">Remove from this playlist</button>':''}<button class="dg" data-p="del">Remove from library</button>`;
  document.body.appendChild(p);const r=btn.getBoundingClientRect();p.style.top=Math.max(8,Math.min(r.bottom+4,innerHeight-p.offsetHeight-8))+'px';p.style.left=Math.max(8,Math.min(r.right-224,innerWidth-232))+'px';
@@ -749,7 +774,7 @@ function cmdAll(){const g=(k,l)=>({g:'Go to',l,f:()=>nav(k)});
  return[{g:'Actions',l:'Shuffle all',f:shuffleAll},{g:'Actions',l:'Smart scan music folder',f:openScanModal},{g:'Actions',l:'Add music files',f:()=>$('picker').click()},{g:'Actions',l:'Hi-Fi Master sound',f:()=>setFx('hd')},{g:'Actions',l:'Concert hall sound',f:()=>setFx('hall')},{g:'Actions',l:'Slowed + reverb',f:()=>setFx('slowed')},{g:'Actions',l:'8D orbit',f:()=>setFx('d8')},{g:'Actions',l:'Lo-fi vinyl',f:()=>setFx('lofi')},{g:'Actions',l:'Studio clean sound',f:()=>setFx('clean')},{g:'Actions',l:'Open 10-band Equalizer & Enhancer',f:openEqModal},{g:'Actions',l:'Test audio & sound engine',f:testAudio},{g:'Actions',l:'Export current song with this sound',f:()=>{if(cur!=null)exportFx(cur);else toast('Play a song first')}},g('lib','Library'),g('fav','Favorites'),g('pls','Playlists'),g('orbit','Now playing'),...MENU.map(m=>g(m[0],m[1])),...songs.map(s=>{const m=meta(s),V=ver(m.title);return{g:'Songs',l:m.title+(V!='Original'?` (${V})`:''),h:m.artist,f:()=>play(s.id)}})]}
 function renderCmd(){const t=$('cq').value.trim().toLowerCase();cmdItems=cmdAll().filter(i=>!t||(i.l+' '+(i.h||'')).toLowerCase().includes(t)).slice(0,12);cmdSel=Math.max(0,Math.min(cmdSel,cmdItems.length-1));
  $('cl').innerHTML=cmdItems.length?cmdItems.map((c,i)=>(i==0||cmdItems[i-1].g!=c.g?`<span class="lbl">${c.g}</span>`:'')+`<button class="ci${i==cmdSel?' on':''}" data-ci="${i}" role="option"><b>${esc(c.l)}</b>${c.h?`<small>${esc(c.h)}</small>`:''}</button>`).join(''):'<p class="nm">Nothing in orbit matches.</p>'}
-function openCmd(){$('cmd').hidden=false;$('cq').value='';cmdSel=0;renderCmd();setTimeout(()=>$('cq').focus(),10)}
+function openCmd(){pushOv();$('cmd').hidden=false;$('cq').value='';cmdSel=0;renderCmd();setTimeout(()=>$('cq').focus(),10)}
 const closeCmd=()=>{$('cmd').hidden=true};
 const runCmd=i=>{const c=cmdItems[i];closeCmd();if(c)c.f()};
 
@@ -771,7 +796,7 @@ function mountNP(host,closable){let t='';for(let i=0;i<120;i++)t+=`<line x1="200
  tst.onpointerleave=()=>{tc.style.transform='';$('sheen').style.transform=''};
  const rc=$('rec');let sx=0,swp=0;rc.addEventListener('pointerdown',e=>{sx=e.clientX;swp=0});rc.addEventListener('pointerup',e=>{const dx=e.clientX-sx;if(Math.abs(dx)>60){swp=1;if(navigator.vibrate)navigator.vibrate(8);dx<0?step(1):step(-1);setTimeout(()=>swp=0,60)}});rc.addEventListener('click',e=>{if(swp){e.stopPropagation();e.preventDefault()}},true);
  icons();updNP();ontime()}
-function openSheet(){if(cur==null||view.k=='orbit')return;$('sheet').hidden=false;document.body.style.overflow='hidden';mountNP($('sheet'),true)}
+function openSheet(){if(cur==null||view.k=='orbit')return;pushOv();$('sheet').hidden=false;document.body.style.overflow='hidden';mountNP($('sheet'),true)}
 function closeSheet(){if($('sheet').hidden)return;$('sheet').hidden=true;$('sheet').innerHTML='';document.body.style.overflow=''}
 function updNP(){if(!$('npt'))return;const s=songs.find(x=>x.id==cur);if(!s){closeSheet();return}const m=meta(s),sd=hash(m.title),V=ver(m.title);
  $('reccv').src=cov(s);$('rs').style.animationDuration=8/rateNow()+'s';
@@ -1012,7 +1037,7 @@ async function setAmb(s){const e=$('amb');if(!e)return;
 // ---------- up next ----------
 function openQueue(){const i=queue.indexOf(cur),b=Math.max(0,i),ids=queue.length?queue.slice(b,b+31):[];
  $('ql').innerHTML=ids.length?ids.map(id=>{const s=songs.find(x=>x.id==id);if(!s)return'';const m=meta(s);return`<div class="qr"><button class="ci${id==cur?' on':''}" data-qi="${id}"><b>${id==cur?'Now · ':''}${esc(m.title)}</b><small>${esc(m.artist||'')}</small></button>${id==cur?'':`<button class="k" data-qm="${id}:-1" aria-label="Move up">▲</button><button class="k" data-qm="${id}:1" aria-label="Move down">▼</button>`}</div>`}).join(''):'<p class="nm">Nothing queued yet. Play a song first.</p>';
- $('qv').hidden=false}
+ pushOv();$('qv').hidden=false}
 const closeQ=()=>{$('qv').hidden=true};
 
 // ---------- clicks ----------
@@ -1096,7 +1121,7 @@ addEventListener('keydown',e=>{
  if(e.code=='Space'&&!/INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName)){e.preventDefault();togglePlay()}});
 
 // ---------- playback ----------
-function play(id,ids){if(ids)queue=ids;const s=songs.find(x=>x.id==id);if(!s)return;if(cu)URL.revokeObjectURL(cu);cu=URL.createObjectURL(s.blob);audio.muted=false;if(audio.volume==0)audio.volume=1;audio.src=cu;if(needEngine())ensureAudio();else wakeAudio();applyRate();audio.play().then(()=>{wakeAudio()}).catch(()=>{toast('Tap the play button to start audio')});cur=id;cnt=0;stat(id).l=Date.now();saveST();loopA=loopB=null;bar();refreshCur();
+function play(id,ids){if(ids)queue=ids;const s=songs.find(x=>x.id==id);if(!s)return;if(cu)URL.revokeObjectURL(cu);cu=URL.createObjectURL(s.blob);audio.muted=false;if(audio.volume==0)audio.volume=1;audio.src=cu;if(needEngine())ensureAudio();else wakeAudio();applyRate();audio.play().then(()=>{wakeAudio()}).catch(()=>{toast('Tap the play button to start audio')});cur=id;cnt=0;stat(id).l=Date.now();saveST();loopA=loopB=null;bar();refreshCur();if($('lyb'))closeMO();
  if('mediaSession' in navigator){const m=meta(s);navigator.mediaSession.metadata=new MediaMetadata({title:m.title,artist:m.artist,album:s.album||'Echo Orbit',artwork:[{src:cov(s),sizes:'512x512',type:s.cover?s.cover.type:'image/png'}]})}}
 function markCur(){document.querySelectorAll('.row.cur').forEach(r=>{r.classList.remove('cur');const o=r.querySelector('.ov');if(o)o.remove()});
  const r=document.querySelector('.row[data-id="'+cur+'"]');if(r){r.classList.add('cur');const c=r.querySelector('.cvw');if(c&&!c.querySelector('.ov'))c.insertAdjacentHTML('beforeend','<span class="ov"><i class="eq'+(audio.paused?' ps':'')+'"><b></b><b></b><b></b></i></span>')}}
@@ -1119,15 +1144,15 @@ function icons(){const pl=!audio.paused;
 let lt=0,lsv=0,cnt=0,errN=0;
 audio.onplay=()=>{if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';lt=Date.now();wakeAudio();crackle();icons();const e=document.querySelector('.row.cur .eq');if(e)e.classList.toggle('ps',audio.paused)};
 audio.onpause=()=>{if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';lt=0;crackle();icons();const e=document.querySelector('.row.cur .eq');if(e)e.classList.toggle('ps',audio.paused)};
-// End of track: always continue. After the last song it wraps to the first (repeat-one is handled by audio.loop).
-audio.onended=()=>{if(songs.length)step(1)};
+// End of track: repeat off stops after the last song, repeat all wraps to the first, shuffle keeps going, repeat one is handled by audio.loop.
+audio.onended=()=>{if(!songs.length)return;if(!rep&&!shuf){const q2=queue.length?queue:(shown.length?shown:songs.map(x=>x.id));if(q2.indexOf(cur)>=q2.length-1){icons();ontime();toast('End of queue. Turn on repeat to loop');return}}step(1)};
 audio.onplaying=()=>{errN=0};
 audio.onerror=()=>{if(!audio.getAttribute('src')||cur==null)return;const s=songs.find(x=>x.id==cur);errN++;toast('Cannot play "'+(s?meta(s).title:'this file')+'". It may be damaged or not supported here.');if(errN<=3&&songs.length>1)setTimeout(()=>step(1),1600);else errN=0};
 audio.onloadedmetadata=()=>{const s=songs.find(x=>x.id==cur);if(s&&!s.dur&&isFinite(audio.duration)){s.dur=audio.duration;put('songs',s)}};
 function ontime(){const d=audio.duration,p=d?audio.currentTime/d:0;
  $$('.tcur').forEach(e=>e.textContent=fmt(audio.currentTime));$$('.tdur').forEach(e=>e.textContent=fmt(d));
  $$('.seekr').forEach(e=>{if(!dgs&&document.activeElement!==e)e.value=p*1000;e.style.setProperty('--fill',p*100+'%')});
- $('mprog').style.width=p*100+'%';updDisc()}
+ $('mprog').style.width=p*100+'%';updDisc();if($('lyb'))lyricSync()}
 audio.ontimeupdate=()=>{const d=audio.duration;if(loopA!=null&&loopB!=null&&d&&audio.currentTime>=loopB*d)audio.currentTime=loopA*d;
  const n=Date.now();if(!audio.paused&&lt&&n-lt<2500){const dt=(n-lt)/1000;CLK[new Date().getHours()]+=dt;if(cur!=null)stat(cur).t+=dt;if(n-lsv>15000){lsv=n;lsSet('eo_clock',CLK);saveST()}}if(cur!=null&&!cnt&&audio.currentTime>=Math.min(30,(audio.duration||60)*.5)){cnt=1;stat(cur).p++;saveST()}fadeTick();lt=audio.paused?0:n;ontime()};
 $('vol').oninput=()=>{audio.volume=$('vol').value;$('vol').style.setProperty('--fill',$('vol').value*100+'%');$('volv').textContent=Math.round($('vol').value*100)};
@@ -1303,19 +1328,23 @@ function pgSettings(){const acc=[['Amber',75],['Rose',10],['Violet',300],['Sky',
 
 function pgAbout(){const L=a=>`<ul class="hl">${a.map(x=>`<li>${x}</li>`).join('')}</ul>`;
  return hd('Echo Orbit','About & help','Works offline once installed')+`<section class="csec"><div class="cb"><p class="lbl">What's new</p>${L(['Albums and Artists pages, Recently played, Most played','Mood mixes built from how each song sounds','Edit song info, cover art and lyrics from the ⋯ menu','Reorder playlists and the queue','Your stats page, settings, custom equalizer and fade between songs','Library file to move favorites and playlists between devices','Storage tools to find big files and duplicates'])}</div><div class="cb" style="padding-top:0"><p class="lbl">Shortcuts</p>${L(['Space: play or pause','Ctrl or ⌘ + K: open the command bar','Left and right arrows on the disc: seek 5 seconds','Esc: close any panel','Swipe the record left or right: next or previous song'])}</div><div class="cb" style="padding-top:0"><p class="lbl">Install on your phone</p>${L(['Android Chrome: menu, then Install app','iPhone Safari: Share, then Add to Home Screen'])}${DIP?'<button class="pill am" data-a="install" style="margin-top:12px">Install app</button>':''}</div><div class="cb" style="padding-top:0"><p class="lbl">Keep your music safe</p><p class="cnote" style="margin-top:8px">Songs live in your browser. Browsers can clear that when space runs low. Use Storage to ask the browser to keep your data, and Cloud backup or the Library file as a safety net.</p></div></section>`}
-function pgPro(){const t=tier(),cur=PLANS.find(p=>TIERS[p.id]==t),why=PROWHY?`<p class="cnote" style="margin:0 0 12px;color:var(--pr)">${esc(PROWHY)}</p>`:'';PROWHY='';
- const pp=PLANS.find(p=>p.id==PAYPLAN),mail=pp?`mailto:${APP_CONFIG.contactEmail}?subject=${encodeURIComponent('Echo Orbit '+pp.name+' payment')}&amp;body=${encodeURIComponent('Plan: '+pp.name+' (Rs '+pp.price+'/month)\nUPI transaction ID: \nMy email: \n\nPlease attach the payment screenshot.')}`:'';
- const cards=PLANS.map(p=>`<div class="card mc"><div class="mcb"><span class="lbl">${p.tag}</span><b>${p.name} · ₹${p.price}<small style="font:12px var(--mo);color:var(--mu)"> /month</small></b><ul class="hl" style="margin:4px 0 0">${p.f.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>${TIERS[p.id]==t?'<span class="lbl">Your plan</span>':`<button class="pill ${p.id=='plus'?'solid':'am'}" data-a="upipay" data-val="${p.id}">Pay ₹${p.price} with UPI</button>`}</div>`).join('');
- return hd('Membership','Plans',cur?cur.name+' plan active':'From ₹29 a month')+`<section class="csec"><div class="cb">${why}<p class="cnote" style="margin:0 0 16px">Free always includes unlimited local playback, Orbit, search, smart mixes, 14 equalizer presets and ${APP_CONFIG.freeExportsPerDay} Studio exports a day.</p><div class="grid mg" style="padding:0">${cards}</div></div>${pp?`<div class="cb" style="padding-top:0"><p class="lbl">After paying for ${pp.name} (₹${pp.price})</p><ol class="hl"><li>Finish the payment in your UPI app. UPI ID: <b>${esc(APP_CONFIG.upiId)}</b></li><li>Email us the screenshot or transaction ID</li><li>We send you a licence key. Enter it below</li></ol><div class="ha" style="margin-top:12px"><a class="pill am" href="${mail}" style="text-decoration:none">Email payment details</a><button class="pill" data-a="upicopy">Copy UPI ID</button></div></div>`:''}<div class="cb" style="padding-top:0"><p class="lbl">Have a licence key?</p><label class="sr"><input id="prokey" placeholder="EO-PLUS-XXXX-XXXX" autocomplete="off"></label><div class="ha" style="margin-top:12px"><button class="pill am" data-a="proact">Activate key</button>${t?'<button class="pill wn" data-a="proclear">Remove key from this device</button>':''}</div><p class="cmsg" id="promsg"></p><p class="cnote">Questions? ${esc(APP_CONFIG.contactEmail)}</p></div></section>`}
-function pgPrivacy(){return hd('Legal','Privacy policy','Last updated November 2026')+`<section class="csec"><div class="cb legal"><p><b>Local-first by design.</b> ${esc(APP_CONFIG.brandName)} stores your music, playlists, lyrics, play counts, and listening clock directly inside your browser (IndexedDB and localStorage). Audio files never leave your device unless you explicitly enable Pro Cloud Backup.</p><p><b>Cloud Backup (optional Pro feature).</b> If you create an account, we store your email address and the audio files you choose to back up in a private, access-controlled folder accessible only to your authenticated account. Nothing is shared publicly.</p><p><b>Payments &amp; licenses.</b> Plans are paid by UPI. We never see your bank details or UPI PIN. If you email us payment proof, we keep your email and transaction ID only to issue and support your licence key. Your plan status is stored on your device.</p><p><b>No ads or tracking.</b> We do not run third-party ad networks, sell user data, or track your listening habits off-device. The app loads typefaces from Google Fonts, which receives a standard web request from your browser.</p><p><b>Deletion &amp; contact.</b> You can delete local data anytime in your browser settings, delete cloud copies from the Cloud page, or request full account deletion by emailing <a href="mailto:${esc(APP_CONFIG.contactEmail)}" style="color:var(--pr)">${esc(APP_CONFIG.contactEmail)}</a>.</p></div></section>`}
-function pgTerms(){return hd('Legal','Terms of use','Last updated November 2026')+`<section class="csec"><div class="cb legal"><p><b>Personal use &amp; ownership.</b> ${esc(APP_CONFIG.brandName)} is a personal audio player and studio effects tool for audio files you own or have legal permission to use.</p><p><b>Copyright &amp; DMCA policy.</b> You are solely responsible for files you import or back up. Cloud storage is strictly for private personal backup; public sharing or distribution of copyrighted material is prohibited. To submit a copyright or DMCA takedown notice, email <a href="mailto:${esc(APP_CONFIG.contactEmail)}" style="color:var(--pr)">${esc(APP_CONFIG.contactEmail)}</a> with proof of ownership and account/file details.</p><p><b>Pro subscriptions &amp; quotas.</b> Paid plans (Lite, Plus, Max) are billed monthly by UPI and unlock the features listed on the Plans page. Cloud backup is limited to 200 MB (Plus) or 500 MB (Max) per account, and ${APP_CONFIG.maxFileMB} MB per file.</p><p><b>Warranty disclaimer.</b> Backups are provided as a convenience; always retain your own copy of irreplaceable files. The service is provided "as is" without warranties of any kind.</p></div></section>`}
+let PAYPER='m';
+const priceOf=p=>PAYPER=='y'?p.year:p.price,perLbl=()=>PAYPER=='y'?'year':'month';
+function pgPro(){const paid=PRO&&PRO.key?tier():0,cur=PLANS.find(p=>TIERS[p.id]==paid),tl=trialActive(),dl=Math.ceil(trialLeft()/864e5),why=PROWHY?`<p class="cnote" style="margin:0 0 12px;color:var(--pr)">${esc(PROWHY)}</p>`:'';PROWHY='';
+ const pp=PLANS.find(p=>p.id==PAYPLAN),amt=pp?priceOf(pp):0,mail=pp?`mailto:${APP_CONFIG.contactEmail}?subject=${encodeURIComponent('Echo Orbit '+pp.name+' payment ('+perLbl()+'ly)')}&amp;body=${encodeURIComponent('Plan: '+pp.name+' (Rs '+amt+'/'+perLbl()+')\nUPI transaction ID: \nMy email: \n\nPlease attach the payment screenshot.')}`:'';
+ const trial=paid?'':tl?`<p class="cnote" style="margin:0 0 16px;color:var(--pr)">Plus trial active: ${dl} day${dl==1?'':'s'} left. Pick a plan below to keep it.</p>`:!trialUsed()?`<div class="ha" style="margin:0 0 20px"><button class="pill lg solid" data-a="trialstart">Start 7-day Plus trial</button><span class="cnote" style="margin:0;align-self:center">Free. No payment needed.</span></div>`:`<p class="cnote" style="margin:0 0 16px">Your free trial has ended. Plans start at ₹29.</p>`;
+ const tog=`<div class="fxr" style="justify-content:flex-start;margin-bottom:16px"><button data-a="payper" data-val="m" class="${PAYPER=='m'?'on':''}">Monthly</button><button data-a="payper" data-val="y" class="${PAYPER=='y'?'on':''}">Yearly · 2 months free</button></div>`;
+ const cards=PLANS.map(p=>{const sv=p.price*12-p.year;return`<div class="card mc"><div class="mcb"><span class="lbl">${p.tag}</span><b>${p.name} · ₹${priceOf(p)}<small style="font:12px var(--mo);color:var(--mu)"> /${perLbl()}</small></b>${PAYPER=='y'?`<span>Save ₹${sv} a year · about ₹${Math.round(p.year/12)}/month</span>`:''}<ul class="hl" style="margin:4px 0 0">${p.f.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>${TIERS[p.id]==paid?'<span class="lbl">Your plan</span>':`<button class="pill ${p.id=='plus'?'solid':'am'}" data-a="upipay" data-val="${p.id}">Pay ₹${priceOf(p)} with UPI</button>`}</div>`}).join('');
+ return hd('Membership','Plans',cur?cur.name+' plan active':tl?'Plus trial active':'From ₹29 a month')+`<section class="csec"><div class="cb">${why}${trial}<p class="cnote" style="margin:0 0 16px">Free always includes unlimited local playback, Orbit, search, smart mixes, 14 equalizer presets and ${APP_CONFIG.freeExportsPerDay} Studio exports a day.</p>${tog}<div class="grid mg" style="padding:0">${cards}</div></div>${pp?`<div class="cb" style="padding-top:0"><p class="lbl">After paying for ${pp.name} (₹${amt}${PAYPER=='y'?' for the year':''})</p><ol class="hl"><li>Finish the payment in your UPI app. UPI ID: <b>${esc(APP_CONFIG.upiId)}</b></li><li>Email us the screenshot or transaction ID</li><li>We send you a licence key. Enter it below</li></ol><div class="ha" style="margin-top:12px"><a class="pill am" href="${mail}" style="text-decoration:none">Email payment details</a><button class="pill" data-a="upicopy">Copy UPI ID</button></div></div>`:''}<div class="cb" style="padding-top:0"><p class="lbl">Have a licence key?</p><label class="sr"><input id="prokey" placeholder="EO-PLUS-XXXX-XXXX" autocomplete="off"></label><div class="ha" style="margin-top:12px"><button class="pill am" data-a="proact">Activate key</button>${paid?'<button class="pill wn" data-a="proclear">Remove key from this device</button>':''}</div><p class="cmsg" id="promsg"></p><p class="cnote">Questions? ${esc(APP_CONFIG.contactEmail)}</p></div></section>`}
+function pgPrivacy(){return hd('Legal','Privacy policy','Last updated November 2026')+`<section class="csec"><div class="cb legal"><p><b>Local-first by design.</b> ${esc(APP_CONFIG.brandName)} stores your music, playlists, lyrics, play counts, and listening clock directly inside your browser (IndexedDB and localStorage). Audio files never leave your device unless you explicitly enable Pro Cloud Backup.</p><p><b>Cloud Backup (optional Pro feature).</b> If you create an account, we store your email address and the audio files you choose to back up in a private, access-controlled folder accessible only to your authenticated account. Nothing is shared publicly.</p><p><b>Payments &amp; licenses.</b> Plans are paid by UPI. We never see your bank details or UPI PIN. If you email us payment proof, we keep your email and transaction ID only to issue and support your licence key. Your plan status is stored on your device.</p><p><b>No ads or tracking.</b> We do not run third-party ad networks, sell user data, or track your listening habits off-device. The app loads typefaces from Google Fonts, which receives a standard web request from your browser. If you tap Find lyrics online, the song title, artist and length are sent to the free lrclib.net lyrics service.</p><p><b>Deletion &amp; contact.</b> You can delete local data anytime in your browser settings, delete cloud copies from the Cloud page, or request full account deletion by emailing <a href="mailto:${esc(APP_CONFIG.contactEmail)}" style="color:var(--pr)">${esc(APP_CONFIG.contactEmail)}</a>.</p></div></section>`}
+function pgTerms(){return hd('Legal','Terms of use','Last updated November 2026')+`<section class="csec"><div class="cb legal"><p><b>Personal use &amp; ownership.</b> ${esc(APP_CONFIG.brandName)} is a personal audio player and studio effects tool for audio files you own or have legal permission to use.</p><p><b>Copyright &amp; DMCA policy.</b> You are solely responsible for files you import or back up. Cloud storage is strictly for private personal backup; public sharing or distribution of copyrighted material is prohibited. To submit a copyright or DMCA takedown notice, email <a href="mailto:${esc(APP_CONFIG.contactEmail)}" style="color:var(--pr)">${esc(APP_CONFIG.contactEmail)}</a> with proof of ownership and account/file details.</p><p><b>Pro subscriptions &amp; quotas.</b> Paid plans (Lite, Plus, Max) are billed monthly or yearly by UPI and unlock the features listed on the Plans page. Cloud backup is limited to 200 MB (Plus) or 500 MB (Max) per account, and ${APP_CONFIG.maxFileMB} MB per file. A free 7-day Plus trial is available once per device, with reduced limits (15 exports a day, 50 MB of cloud).</p><p><b>Warranty disclaimer.</b> Backups are provided as a convenience; always retain your own copy of irreplaceable files. The service is provided "as is" without warranties of any kind.</p></div></section>`}
 
 const PAGES={albums:()=>pgCards('album'),artists:()=>pgCards('artist'),grp:pgGrp,recent:pgRecent,most:pgMost,moods:pgMoods,auto:pgAuto,find:pgFind,mood:pgMood,stats:pgStats,storage:pgStorage,file:pgFile,pro:pgPro,settings:pgSettings,about:pgAbout,privacy:pgPrivacy,terms:pgTerms};
 
 // ---------- edit info, cover and lyrics ----------
 const shrink=f=>new Promise(r=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const k=Math.min(1,640/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>r(b||f),'image/jpeg',.9)};im.onerror=()=>{URL.revokeObjectURL(u);r(f)};im.src=u});
 let EDS=null,EDC,EDC_URL=null;
-const openMO=h=>{$('mob').innerHTML=h;$('mo').hidden=false};
+const openMO=h=>{pushOv();$('mob').innerHTML=h;$('mo').hidden=false};
 const closeMO=()=>{if(EDC_URL){URL.revokeObjectURL(EDC_URL);EDC_URL=null}$('mo').hidden=true;$('mob').innerHTML=''};
 function openPro(reason=''){PROWHY=reason;closeMO();nav('pro')}
 const OWNER_HASH='5ba612a2e977554fee3e68a2f02b603b61df4f6d45ce5abafdeb31dabd9d1af7';
@@ -1351,14 +1380,30 @@ async function loadDemo(){
  }catch(e){toast('Could not generate demo track')}}
 const mhead=t=>`<div class="cin"><span class="lbl" style="padding:20px 0">${t}</span><button class="lbl" data-a="mclose" style="margin-left:auto;min-height:44px">close</button></div>`;
 function openEdit(s){EDS=s.id;EDC=undefined;const m=meta(s);
- openMO(mhead('Edit song')+`<div class="mf"><div class="ecv"><img id="e_img" src="${cov(s)}" alt=""><div><button class="pill" data-a="ecpick">Choose cover…</button>${s.cover?'<button class="tl" data-a="ecclr" style="display:block">Use default cover</button>':''}</div></div><p class="lbl">Title</p><label class="sr"><input id="e_t" value="${esc(m.title)}"></label><p class="lbl">Artist</p><label class="sr"><input id="e_a" value="${esc(m.artist)}"></label><p class="lbl">Album</p><label class="sr"><input id="e_al" value="${esc(s.album||'')}"></label><p class="lbl">Lyrics</p><textarea id="e_ly" placeholder="Paste lyrics here">${esc(s.lyrics||'')}</textarea><div class="ha" style="margin-top:8px"><button class="pill solid" data-a="esave">Save</button><button class="pill" data-a="mclose">Cancel</button></div></div>`);setTimeout(()=>{const i=$('e_t');if(i)i.focus()},30)}
+ openMO(mhead('Edit song')+`<div class="mf"><div class="ecv"><img id="e_img" src="${cov(s)}" alt=""><div><button class="pill" data-a="ecpick">Choose cover…</button>${s.cover?'<button class="tl" data-a="ecclr" style="display:block">Use default cover</button>':''}</div></div><p class="lbl">Title</p><label class="sr"><input id="e_t" value="${esc(m.title)}"></label><p class="lbl">Artist</p><label class="sr"><input id="e_a" value="${esc(m.artist)}"></label><p class="lbl">Album</p><label class="sr"><input id="e_al" value="${esc(s.album||'')}"></label><p class="lbl">Lyrics</p><textarea id="e_ly" placeholder="Paste lyrics here. Plus can show synced lines like [01:23.45] text">${esc(s.lyrics||'')}</textarea><div class="ha" style="margin-top:8px"><button class="pill solid" data-a="esave">Save</button><button class="pill" data-a="mclose">Cancel</button></div></div>`);setTimeout(()=>{const i=$('e_t');if(i)i.focus()},30)}
 async function saveEdit(){const s=songs.find(x=>x.id==EDS);if(!s)return closeMO();const t=$('e_t').value.trim(),a=$('e_a').value.trim(),al=$('e_al').value.trim(),ly=$('e_ly').value.replace(/\s+$/,'');
  if(t){s.title=t;delete s.unnamed}else delete s.title;if(a)s.artist=a;else delete s.artist;if(al)s.album=al;else delete s.album;if(ly.trim())s.lyrics=ly;else delete s.lyrics;
  if(EDC===null)delete s.cover;else if(EDC)s.cover=EDC;
  if(EDC!==undefined){const u=CU.get(s.id);if(u)URL.revokeObjectURL(u);CU.delete(s.id);AMB.delete(s.id)}
  await put('songs',s);closeMO();await load();render();bar();toast('Saved')}
-function openLyrics(){const s=songs.find(x=>x.id==cur);if(!s)return;
- openMO(mhead('Lyrics · '+esc(meta(s).title))+`<div class="mf">${s.lyrics?`<pre class="ly">${esc(s.lyrics)}</pre>`:'<p class="none">No lyrics saved for this song yet.</p>'}<div class="ha" style="margin-top:16px"><button class="pill am" data-a="lyedit">${s.lyrics?'Edit':'Add lyrics'}</button></div></div>`)}
+const LRCT=/\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g,isLRC=t=>/\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?\]/.test(t||'');
+function parseLRC(t){const out=[];for(const raw of String(t).split(/\r?\n/)){const tags=[...raw.matchAll(LRCT)];if(!tags.length)continue;const x=raw.replace(LRCT,'').trim();for(const m of tags){const ms=m[3]?parseInt((m[3]+'00').slice(0,3),10):0;out.push({t:parseInt(m[1],10)*60+parseInt(m[2],10)+ms/1000,x})}}return out.sort((p,q)=>p.t-q.t)}
+const stripLRC=t=>String(t).split(/\r?\n/).map(l=>l.replace(LRCT,'').trim()).filter(l=>!/^\[[a-z]{2,}:[^\]]*\]$/i.test(l)).join('\n');
+let LYR=[],LYI=-1;
+function openLyrics(){const s=songs.find(x=>x.id==cur);if(!s)return;const sy=isLRC(s.lyrics),ok=sy&&has('plus');let body;
+ if(!s.lyrics)body='<p class="none">No lyrics saved for this song yet.</p>';
+ else if(ok){LYR=parseLRC(s.lyrics);LYI=-1;body=`<div id="lyb">${LYR.map((l,i)=>`<div class="lyl" data-a="lyseek" data-val="${l.t}">${esc(l.x||'♪')}</div>`).join('')}</div>`}
+ else body=`<pre class="ly">${esc(sy?stripLRC(s.lyrics):s.lyrics)}</pre>${sy?'<p class="cnote">This song has timed lyrics. Synced lyrics that follow the song line by line come with Plus, and you can try it free for 7 days.</p><div class="ha" style="margin-top:12px"><button class="pill solid" data-a="openpro">See plans</button></div>':''}`;
+ openMO(mhead('Lyrics · '+esc(meta(s).title))+`<div class="mf">${body}<div class="ha" style="margin-top:16px"><button class="pill am" data-a="lyedit">${s.lyrics?'Edit':'Add lyrics'}</button>${sy?'':'<button class="pill" data-a="lyfind">Find lyrics online</button>'}</div></div>`);
+ if(ok)setTimeout(lyricSync,60)}
+function lyricSync(){const b=$('lyb');if(!b||!LYR.length)return;const t=audio.currentTime+.15;let i=-1;for(let k=0;k<LYR.length;k++){if(LYR[k].t<=t)i=k;else break}if(i===LYI)return;LYI=i;const o=b.querySelector('.lyl.on');if(o)o.classList.remove('on');const el=b.children[i];if(el){el.classList.add('on');b.scrollTo({top:el.offsetTop-b.clientHeight/2+el.clientHeight/2,behavior:'smooth'})}}
+async function fetchLyrics(){const s=songs.find(x=>x.id==cur);if(!s)return;const m=meta(s);if(!m.title)return toast('Give the song a title first');toast('Searching for lyrics…');
+ try{let j=null;const qs=new URLSearchParams({track_name:m.title,artist_name:m.artist||'',album_name:s.album||'',duration:String(Math.round(s.dur||audio.duration||0))});
+  try{const r=await fetch('https://lrclib.net/api/get?'+qs);if(r.ok)j=await r.json()}catch(e){if(!navigator.onLine)throw e}
+  if(!j||(!j.syncedLyrics&&!j.plainLyrics)){const r2=await fetch('https://lrclib.net/api/search?'+new URLSearchParams({q:(m.title+' '+(m.artist||'')).trim()}));if(r2.ok){const a=await r2.json();j=Array.isArray(a)?(a.find(x=>x.syncedLyrics)||a.find(x=>x.plainLyrics)||null):null}}
+  const ly=j&&(j.syncedLyrics||j.plainLyrics);if(!ly)return toast('No lyrics found for this song');
+  s.lyrics=ly;await put('songs',s);toast(j.syncedLyrics?'Synced lyrics found':'Lyrics found');if(!$('mo').hidden)openLyrics()}
+ catch(e){toast('Could not reach the lyrics service. Check your internet')}}
 
 // ---------- fade between songs ----------
 function fadeTick(){if(!AC||!A.out)return;const d=audio.duration,c=audio.currentTime;if(FADE&&d&&isFinite(d)){A.fd=1;A.out.gain.setTargetAtTime(Math.max(.0001,Math.min(1,c/FADE,(d-c)/FADE)),AC.currentTime,.05)}else if(A.fd){A.fd=0;A.out.gain.setTargetAtTime(1,AC.currentTime,.05)}}
@@ -1371,6 +1416,11 @@ function act2(act,a){switch(act){
  case 'esave':return saveEdit().then(()=>1);
  case 'lyrics':openLyrics();return 1;
  case 'lyedit':{const s=songs.find(x=>x.id==cur);if(s)openEdit(s);return 1}
+ case 'showmore':LIM+=200;paint();return 1;
+ case 'trialstart':startTrial();return 1;
+ case 'payper':PAYPER=a.dataset.val=='y'?'y':'m';render();return 1;
+ case 'lyseek':if(audio.duration)audio.currentTime=+a.dataset.val;return 1;
+ case 'lyfind':return fetchLyrics().then(()=>1);
  case 'shufall':shuffleAll();return 1;
  case 'playmix':{const l=mixList(a.dataset.val).map(s=>s.id);if(l.length){shuf=1;icons();play(l[Math.floor(Math.random()*l.length)],l)}return 1}
  case 'similar':playSimilar();return 1;
@@ -1386,7 +1436,7 @@ function act2(act,a){switch(act){
  case 'scancancel':SCAN.cancel=1;return 1;
  case 'resync':{const f=SAVED_FOLDERS.find(x=>x.id==+a.dataset.val);if(f&&f.handle){closeMO();return scanDirHandle(f.handle,false).then(()=>1)}return 1}
  case 'openpro':openPro();return 1;
- case 'upipay':{const p=PLANS.find(x=>x.id==a.dataset.val);if(!p)return 1;PAYPLAN=p.id;render();const u='upi://pay?pa='+APP_CONFIG.upiId+'&pn='+encodeURIComponent(APP_CONFIG.brandName)+'&am='+p.price+'.00&cu=INR&tn='+encodeURIComponent('Echo Orbit '+p.name);setTimeout(()=>{location.href=u},150);return 1}
+ case 'upipay':{const p=PLANS.find(x=>x.id==a.dataset.val);if(!p)return 1;PAYPLAN=p.id;render();const u='upi://pay?pa='+APP_CONFIG.upiId+'&pn='+encodeURIComponent(APP_CONFIG.brandName)+'&am='+priceOf(p)+'.00&cu=INR&tn='+encodeURIComponent('Echo Orbit '+p.name+' '+perLbl());setTimeout(()=>{location.href=u},150);return 1}
  case 'upicopy':if(navigator.clipboard)navigator.clipboard.writeText(APP_CONFIG.upiId).then(()=>toast('UPI ID copied'),()=>toast(APP_CONFIG.upiId));else toast(APP_CONFIG.upiId);return 1;
  case 'proact':return activatePro().then(()=>1);
  case 'proclear':PRO=null;lsSet('eo_pro',null);render();toast('Pro key removed from this device');return 1;
@@ -1427,13 +1477,13 @@ async function readTags(f){const r=await readTags0(f);
  if(!r.title&&!r.artist&&f.size>256&&!/\.(flac|wav|m4a|mp4)$/i.test(f.name)){try{const b=new Uint8Array(await f.slice(f.size-128).arrayBuffer());
   if(str(b,0,3)=='TAG'){const g=(a,c)=>new TextDecoder('windows-1252').decode(b.subarray(a,c)).replace(/\0[\s\S]*$/,'').trim(),t=g(3,33),a=g(33,63),al=g(63,93);if(t){r.title=t;if(a)r.artist=a;if(al&&!r.album)r.album=al}}}catch(e){}}return r}
 // ---------- start ----------
-(async()=>{$$('.trs').forEach(e=>e.innerHTML=TR());$('minext').innerHTML=I('fwd');$('vi').innerHTML=I('vol');$('topsearch').innerHTML=I('search');$('topmenu').innerHTML=I('menu');$('dwx').innerHTML=I('close');$('cmi').innerHTML=I('search');
+(async()=>{try{history.replaceState({eo:1,k:view.k,id:view.id},'')}catch(e){}$$('.trs').forEach(e=>e.innerHTML=TR());$('minext').innerHTML=I('fwd');$('vi').innerHTML=I('vol');$('topsearch').innerHTML=I('search');$('topmenu').innerHTML=I('menu');$('dwx').innerHTML=I('close');$('cmi').innerHTML=I('search');
  setTimeout(()=>{const sp=$('splash');if(sp)sp.remove()},2000);icons();if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
  render();bar();
  try{
-  await open();await load();if(RECOV)view={k:'cloud',id:0};render();bar();
+  await open();await load();if(RECOV){view={k:'cloud',id:0};try{history.replaceState({eo:1,k:'cloud',id:0},'')}catch(e){}}render();bar();
   if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
-  enrich().then(analyzeSongs);autoSyncFolders();recheckPro();
+  enrich().then(analyzeSongs);autoSyncFolders();recheckPro();setTimeout(trialNotice,4500);
  }catch(e){
   render();bar();
   toast('Storage limited here (open via https:// or close other tabs to save songs)');
