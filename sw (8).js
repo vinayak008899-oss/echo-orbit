@@ -1,29 +1,62 @@
-// Caches the app so it opens with no internet. Your songs live in the browser database, not here.
-// Bump this version whenever you publish a new index.html so old caches are dropped.
-const C = 'mymusic-v13', A = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-192.png', 'icon-maskable-512.png'];
+// Echo Orbit service worker: offline app shell. Bump VERSION whenever you deploy a new index.html.
+const VERSION = 'eo-v4';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(C).then(c => c.addAll(A)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(VERSION).then(c => Promise.all(SHELL.map(u => c.add(u).catch(() => {})))).then(() => self.skipWaiting())
+  );
 });
+
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim()));
+  e.waitUntil(
+    caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())
+  );
 });
+
 self.addEventListener('fetch', e => {
-  const r = e.request, u = new URL(r.url);
-  if (r.method !== 'GET') return;
-  if (u.origin !== location.origin && !/(^|\.)(fonts\.googleapis\.com|fonts\.gstatic\.com)$/.test(u.hostname)) return;
-  const shell = r.mode === 'navigate' || (u.origin === location.origin && /(\/|index\.html|sw\.js)$/.test(u.pathname));
-  if (shell) {
-    e.respondWith(fetch(r).then(res => {
-      if (res.ok) { const copy = res.clone(); caches.open(C).then(c => c.put(r, copy)); }
-      return res;
-    }).catch(() => caches.match(r, { ignoreSearch: true }).then(hit => hit || caches.match('index.html'))));
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+
+  // Never cache Supabase (auth, storage, licence checks) or anything not http(s)
+  if (!/^https?:$/.test(url.protocol) || url.hostname.endsWith('.supabase.co')) return;
+
+  // Google Fonts: stale-while-revalidate
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    e.respondWith(
+      caches.open(VERSION).then(c =>
+        c.match(req).then(hit => {
+          const net = fetch(req).then(r => { if (r && (r.ok || r.type === 'opaque')) c.put(req, r.clone()); return r; }).catch(() => hit);
+          return hit || net;
+        })
+      )
+    );
     return;
   }
-  e.respondWith(caches.match(r, { ignoreSearch: true }).then(hit => {
-    const net = fetch(r).then(res => {
-      if (res.ok || res.type === 'opaque') { const copy = res.clone(); caches.open(C).then(c => c.put(r, copy)); }
-      return res;
-    }).catch(() => hit);
-    return hit || net;
-  }));
+
+  if (url.origin !== location.origin) return;
+
+  // Pages: network first so updates arrive, cached copy when offline
+  if (req.mode === 'navigate') {
+    e.respondWith(
+      fetch(req).then(r => {
+        const copy = r.clone();
+        caches.open(VERSION).then(c => c.put('./index.html', copy));
+        return r;
+      }).catch(() => caches.match('./index.html').then(r => r || caches.match('./')))
+    );
+    return;
+  }
+
+  // Other same-origin files: cache first, refresh in background
+  e.respondWith(
+    caches.match(req).then(hit => {
+      const net = fetch(req).then(r => {
+        if (r && r.ok) { const copy = r.clone(); caches.open(VERSION).then(c => c.put(req, copy)); }
+        return r;
+      }).catch(() => hit);
+      return hit || net;
+    })
+  );
 });
