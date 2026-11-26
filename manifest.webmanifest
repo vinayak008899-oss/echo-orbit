@@ -1,16 +1,18 @@
 {
-  "name": "My Music",
-  "short_name": "My Music",
-  "description": "Private, ad-free, offline music player for your own songs",
+  "name": "Echo Orbit",
+  "short_name": "Echo Orbit",
+  "description": "Private music player with orbit view, sound studio and cloud backup.",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#14110f",
-  "theme_color": "#14110f",
+  "background_color": "#0c0e12",
+  "theme_color": "#0c0e12",
   "icons": [
-    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
