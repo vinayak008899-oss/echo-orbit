@@ -110,6 +110,17 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border:0;border-radiu
 @media(min-width:1024px){.hd .r{flex-direction:row;align-items:flex-end;justify-content:space-between}}
 
 @media(max-width:639px){.hd .r{flex-wrap:wrap}.hd .r>div:first-child{flex:1 1 100%}.hd .ha{width:100%}.hd .ha .pill{flex:1 1 auto;justify-content:center}}
+/* splash */
+#splash{position:fixed;inset:0;z-index:200;display:grid;place-content:center;justify-items:center;gap:20px;background:var(--bg);pointer-events:none;animation:spOut .5s ease 1.3s forwards}
+#splash svg{width:120px;height:120px;overflow:visible}
+#splash .sp-in{transform-origin:50px 50px;transform-box:view-box;animation:spIn .7s var(--ea) both}
+#splash .sp-orb{transform-origin:50px 50px;transform-box:view-box;animation:spOrb 1.2s cubic-bezier(.3,.7,.2,1) both}
+#splash .lbl{opacity:0;animation:spTx .5s ease .6s forwards;color:var(--fg)}
+@keyframes spIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+@keyframes spOrb{from{opacity:0;transform:rotate(-300deg)}30%{opacity:1}to{opacity:1;transform:none}}
+@keyframes spTx{to{opacity:1}}
+@keyframes spOut{to{opacity:0;visibility:hidden}}
+@media(prefers-reduced-motion:reduce){#splash{display:none}}
 /* logo + menu */
 #tlogo{position:fixed;z-index:25;top:calc(max(.5rem,env(safe-area-inset-top)) + 2px);right:12px;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;transition:transform .18s var(--ea)}
 #tlogo:active{transform:scale(.93)}#tlogo:hover svg{filter:drop-shadow(0 0 8px var(--pg))}#tlogo svg{width:38px;height:38px;transition:filter .2s}
@@ -277,6 +288,7 @@ select{height:44px;min-width:0;background:var(--bg);color:var(--mu);border:1px s
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true"><svg viewBox="0 0 100 100"><circle class="sp-in" cx="50" cy="50" r="25.5" fill="none" stroke="#a0483c" stroke-width="4.9"/><g class="sp-orb"><path d="M88.35 28.22A44.1 44.1 0 1 1 71.94 11.74" fill="none" stroke="#ff7050" stroke-width="4.9" stroke-linecap="round"/><circle cx="79.6" cy="20.4" r="6.65" fill="#f4efe6"/></g><circle class="sp-in" cx="50" cy="50" r="10.5" fill="#ff7050"/></svg><span class="lbl">Echo<b style="color:var(--pr);font-weight:400">·</b>Orbit</span></div>
 <div id="amb"></div>
 <nav id="rail" aria-label="Main"></nav>
 <button id="tlogo" data-v="lib" aria-label="Echo Orbit home"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="25.5" fill="none" stroke="#a0483c" stroke-width="4.9"/><path d="M88.35 28.22A44.1 44.1 0 1 1 71.94 11.74" fill="none" stroke="#ff7050" stroke-width="4.9" stroke-linecap="round"/><circle cx="50" cy="50" r="10.5" fill="#ff7050"/><circle cx="79.6" cy="20.4" r="6.65" fill="#f4efe6"/></svg></button>
@@ -1343,7 +1355,7 @@ async function readTags(f){const r=await readTags0(f);
   if(str(b,0,3)=='TAG'){const g=(a,c)=>new TextDecoder('windows-1252').decode(b.subarray(a,c)).replace(/\0[\s\S]*$/,'').trim(),t=g(3,33),a=g(33,63),al=g(63,93);if(t){r.title=t;if(a)r.artist=a;if(al&&!r.album)r.album=al}}}catch(e){}}return r}
 // ---------- start ----------
 (async()=>{$$('.trs').forEach(e=>e.innerHTML=TR());$('minext').innerHTML=I('fwd');$('vi').innerHTML=I('vol');$('topsearch').innerHTML=I('search');$('topmenu').innerHTML=I('menu');$('dwx').innerHTML=I('close');$('cmi').innerHTML=I('search');
- icons();if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
+ setTimeout(()=>{const sp=$('splash');if(sp)sp.remove()},2000);icons();if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
  render();bar();
  try{
   await open();await load();if(RECOV)view={k:'cloud',id:0};render();bar();
